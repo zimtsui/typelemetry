@@ -19,4 +19,4 @@ OtelApi <|-- OtelSdk
 
 ## [Trace](./examples/trace.ts)
 
-## [Log](./examples/log.ts)
+## [Log](./examples/logs.ts)

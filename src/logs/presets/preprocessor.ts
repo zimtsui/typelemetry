@@ -4,15 +4,8 @@ import { chalkStderr } from 'chalk';
 import { Tracer } from '../../trace/tracer.ts';
 import { levelMap } from './level.ts';
 import { Preprocessor as GenericPreprocessor } from '../preprocessor.ts';
-import { SpanFrame } from '../../trace/span-stack.ts';
 
 
-function readSpanFrames(payload: unknown): SpanFrame[] {
-    if (payload instanceof Error) {
-        const e = payload;
-        return [...Tracer.extractErrorSpanFrames(e), ...readSpanFrames(e.cause)];
-    } else return [];
-}
 
 export type Preprocessor = GenericPreprocessor<typeof levelMap>;
 export const preprocessor: Preprocessor = data => {
@@ -42,22 +35,12 @@ export const preprocessor: Preprocessor = data => {
     const spanFrames = Tracer.getSpanFrames();
     if (spanFrames.length)
         stderr.write(
-            '(Spans) ' +
+            '> ' +
             spanFrames.map(
-                frame => frame.name + ' ' + JSON.stringify(frame.attrs),
-            ).join(' > ') + '\n',
-        );
-
-    const errorSpanFrames = readSpanFrames(data.message);
-    if (errorSpanFrames.length)
-        stderr.write(
-            '(Error) ' +
-            errorSpanFrames.map(
                 frame => frame.name + ' ' + JSON.stringify(frame.attrs),
             ).join(' > ') + '\n',
         );
 
     const messageString = formatWithOptions({ depth: null, colors: !!stderr.isTTY }, data.message);
     stderr.write(messageString + '\n');
-
 }

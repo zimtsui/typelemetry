@@ -1,11 +1,9 @@
 import * as OTEL from '@opentelemetry/api';
 import { SpanFrame, SpanStack } from './span-stack.ts';
-import { Injection } from './error-injection.ts';
 
 
 
 const spanStack = SpanStack.getInstance();
-const errorInjection = Injection.getInstance();
 
 export class Tracer {
     protected tracer: OTEL.Tracer;
@@ -19,10 +17,6 @@ export class Tracer {
         if (span) span.setAttribute(key, value);
         const frame = spanStack.getFrame();
         if (frame) frame.attrs[key] = value;
-    }
-
-    public static extractErrorSpanFrames(e: Error): SpanFrame[] {
-        return errorInjection.read(e);
     }
 
     public static getSpanFrames(): SpanFrame[] {
@@ -87,10 +81,7 @@ export class Tracer {
                 try {
                     return OTEL.context.with(slaveContext, f);
                 } catch (e) {
-                    if (e instanceof Error) {
-                        errorInjection.prepend(e);
-                        slaveSpan.recordException(e);
-                    }
+                    if (e instanceof Error) slaveSpan.recordException(e);
                     slaveSpan.setStatus({ code: OTEL.SpanStatusCode.ERROR });
                     throw e;
                 } finally {
@@ -99,6 +90,7 @@ export class Tracer {
             },
         );
     }
+
     /**
      * @param f is allowed to throw synchronously.
      */
@@ -116,10 +108,7 @@ export class Tracer {
                 try {
                     return await OTEL.context.with(slaveContext, f);
                 } catch (e) {
-                    if (e instanceof Error) {
-                        errorInjection.prepend(e);
-                        slaveSpan.recordException(e);
-                    }
+                    if (e instanceof Error) slaveSpan.recordException(e);
                     slaveSpan.setStatus({ code: OTEL.SpanStatusCode.ERROR });
                     throw e;
                 } finally {
@@ -138,6 +127,7 @@ export class Tracer {
     /**
      * @param f is allowed to throw synchronously.
      */
+
     public spawnAsync<R>(
         name: string, f: () => PromiseLike<R>,
         attrs: Record<string, OTEL.AttributeValue> = {},
@@ -151,6 +141,7 @@ export class Tracer {
     ): R {
         return this.createSync(name, f, OTEL.context.active(), attrs);
     }
+
     /**
      * @param f is allowed to throw synchronously.
      */
@@ -173,6 +164,7 @@ export class Tracer {
             descriptor.value = activeMethod;
         }
     }
+
     public forkedAsync<R>(name?: string) {
         return (target: any, propertyKey: string, descriptor: TypedPropertyDescriptor<(this: any, ...args: any[]) => Promise<R>>) => {
             const that = this;
@@ -185,6 +177,7 @@ export class Tracer {
             descriptor.value = activeMethod;
         }
     }
+
     public spawnedSync<R>(name?: string) {
         return (target: any, propertyKey: string, descriptor: TypedPropertyDescriptor<(this: any, ...args: any[]) => R>) => {
             const that = this;
@@ -197,6 +190,7 @@ export class Tracer {
             descriptor.value = activeMethod;
         }
     }
+
     public spawnedAsync<R>(name?: string) {
         return (target: any, propertyKey: string, descriptor: TypedPropertyDescriptor<(this: any, ...args: any[]) => Promise<R>>) => {
             const that = this;

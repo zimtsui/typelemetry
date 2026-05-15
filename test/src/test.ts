@@ -272,7 +272,7 @@ test.serial('Tracer.forkSync creates a child span from the active context', asyn
     }
 });
 
-test.serial('Tracer.spawnSync injects extracted frames into errors', async (t) => {
+test.serial('Tracer.spawnSync records thrown errors on the created span', async (t) => {
     const { exporter, cleanup } = useTracerProvider();
     const tracer = new Tracer('scope');
     const error = new Error('boom');
@@ -290,7 +290,6 @@ test.serial('Tracer.spawnSync injects extracted frames into errors', async (t) =
 
         const [span] = exporter.getFinishedSpans();
         t.is(thrown, error);
-        t.deepEqual(Tracer.extractErrorSpanFrames(error), [{ name: 'failing-sync', attrs: { 'request.id': 'sync-1' } }]);
         t.is(span?.status.code, OTEL.SpanStatusCode.ERROR);
         t.is(span?.events[0]?.name, 'exception');
     } finally {
@@ -374,7 +373,7 @@ test.serial('Tracer.forkAsync creates a child span across async boundaries', asy
     }
 });
 
-test.serial('Tracer.spawnAsync injects extracted frames into errors', async (t) => {
+test.serial('Tracer.spawnAsync records thrown errors on the created span', async (t) => {
     const { exporter, cleanup } = useTracerProvider();
     const tracer = new Tracer('scope');
     const error = new Error('async boom');
@@ -393,7 +392,6 @@ test.serial('Tracer.spawnAsync injects extracted frames into errors', async (t) 
 
         const [span] = exporter.getFinishedSpans();
         t.is(thrown, error);
-        t.deepEqual(Tracer.extractErrorSpanFrames(error), [{ name: 'failing-async', attrs: { 'request.id': 'async-1' } }]);
         t.is(span?.status.code, OTEL.SpanStatusCode.ERROR);
         t.is(span?.events[0]?.name, 'exception');
     } finally {
@@ -401,7 +399,7 @@ test.serial('Tracer.spawnAsync injects extracted frames into errors', async (t) 
     }
 });
 
-test.serial('Tracer.extractErrorSpanFrames preserves the throw-site span stack', async (t) => {
+test.serial('Tracer.getSpanFrames exposes the throw-site span stack while throwing', async (t) => {
     const { cleanup } = useTracerProvider();
     const tracer = new Tracer('scope');
     let throwSiteFrames: ReturnType<typeof snapshotSpanFrames> = [];
@@ -427,7 +425,7 @@ test.serial('Tracer.extractErrorSpanFrames preserves the throw-site span stack',
             { name: 'outer', attrs: { 'outer.kind': 'root', 'request.id': 'req-1' } },
             { name: 'inner', attrs: { 'inner.kind': 'child', step: 'throw' } },
         ]);
-        t.deepEqual(Tracer.extractErrorSpanFrames(thrown), throwSiteFrames);
+        t.is(thrown?.message, 'created and thrown inside inner');
         t.deepEqual(Tracer.getSpanFrames(), []);
     } finally {
         await cleanup();
@@ -472,7 +470,7 @@ test.serial('Tracer records thrown errors on sync and async spans', async (t) =>
     }
 });
 
-test.serial('forkedAsync decorator injects nested frames when async method throws', async (t) => {
+test.serial('forkedAsync decorator records thrown errors on nested spans', async (t) => {
     const { exporter, cleanup } = useTracerProvider();
     const tracer = new Tracer('scope');
     const error = new Error('decorated async boom');
@@ -494,12 +492,10 @@ test.serial('forkedAsync decorator injects nested frames when async method throw
         await Promise.resolve();
 
         const spans = exporter.getFinishedSpans();
+        const parentSpan = spans.find((span) => span.name === 'parent');
         const loadSpan = spans.find((span) => span.name === 'load');
         t.is(thrown, error);
-        t.deepEqual(
-            Tracer.extractErrorSpanFrames(error).map((frame) => frame.name),
-            ['parent', 'load'],
-        );
+        t.is(loadSpan?.parentSpanContext?.spanId, parentSpan?.spanContext().spanId);
         t.is(loadSpan?.status.code, OTEL.SpanStatusCode.ERROR);
         t.is(loadSpan?.events[0]?.name, 'exception');
     } finally {
@@ -507,16 +503,18 @@ test.serial('forkedAsync decorator injects nested frames when async method throw
     }
 });
 
-test.serial('Tracer.setSpanAttribute writes to the active span and extracted frames', async (t) => {
+test.serial('Tracer.setSpanAttribute writes to the active span and current frames', async (t) => {
     const { exporter, cleanup } = useTracerProvider();
     const tracer = new Tracer('scope');
     const error = new Error('attr boom');
+    let throwSiteFrames: ReturnType<typeof snapshotSpanFrames> = [];
 
     try {
         const thrown = t.throws(() => tracer.spawnSync('outer', () => {
             Tracer.setSpanAttribute('request.id', 'r1');
             return tracer.forkSync('inner', () => {
                 Tracer.setSpanAttribute('user.id', 7);
+                throwSiteFrames = snapshotSpanFrames();
                 throw error;
             });
         }));
@@ -528,7 +526,7 @@ test.serial('Tracer.setSpanAttribute writes to the active span and extracted fra
         const innerSpan = spans.find((span) => span.name === 'inner');
 
         t.is(thrown, error);
-        t.deepEqual(Tracer.extractErrorSpanFrames(error), [
+        t.deepEqual(throwSiteFrames, [
             { name: 'outer', attrs: { 'request.id': 'r1' } },
             { name: 'inner', attrs: { 'user.id': 7 } },
         ]);

@@ -21,9 +21,9 @@
   },
   "author": "Zim",
   "devDependencies": {
-    "@opentelemetry/sdk-node": "^0.215.0",
+    "@opentelemetry/sdk-node": "^0.218.0",
     "@opentelemetry/sdk-trace-node": "^2.6.0",
-    "ava": "^7.0.0",
+    "ava": "^8.0.0",
     "typescript": "^6.0.2"
   },
   "ava": {
@@ -31,7 +31,7 @@
   },
   "peerDependencies": {
     "@opentelemetry/api": "^1.9.1",
-    "@opentelemetry/api-logs": "^0.215.0"
+    "@opentelemetry/api-logs": "^0.218.0"
   },
   "dependencies": {
     "@types/node": "^24.12.2"

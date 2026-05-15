@@ -3,7 +3,6 @@ import * as OTEL from '@opentelemetry/api';
 
 
 
-
 export class SpanStack {
     protected constructor() {}
 
