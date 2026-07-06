@@ -34,7 +34,8 @@
     "@opentelemetry/api-logs": "^0.218.0"
   },
   "dependencies": {
-    "@types/node": "^24.12.2"
+    "@types/node": "^24.12.2",
+    "chalk": "^5.6.2"
   },
   "engines": {
     "node": ">=24"
